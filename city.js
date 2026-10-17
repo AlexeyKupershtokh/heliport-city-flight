@@ -95,7 +95,7 @@ export function createCity(scene, seed = 42) {
     mesh.computeBoundingSphere();
     group.add(mesh);
   };
-  const quads = (name, points, color) => {
+  const quads = (name, points, color, depthOffset = 0) => {
     if (!points.length) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
@@ -104,7 +104,12 @@ export function createCity(scene, seed = 42) {
     );
     geometry.computeVertexNormals();
     geometrySet.add(geometry);
-    const mesh = new THREE.Mesh(geometry, material(color));
+    const surface = material(color);
+    // Centimetre-separated ground layers need a depth bias at city-scale distances.
+    surface.polygonOffset = depthOffset !== 0;
+    surface.polygonOffsetFactor = depthOffset;
+    surface.polygonOffsetUnits = depthOffset;
+    const mesh = new THREE.Mesh(geometry, surface);
     mesh.name = name;
     group.add(mesh);
   };
@@ -564,9 +569,9 @@ export function createCity(scene, seed = 42) {
   quads("terrain-and-lawns", greenery, "#8f9d7c");
   quads("river", water, "#719b9e");
   quads("embankments", bank, "#c4c5b7");
-  quads("sidewalks", sidewalkPoints, "#b8bbb1");
-  quads("roads", roadPoints, "#667171");
-  quads("road-markings", markings, "#e4dec3");
+  quads("sidewalks", sidewalkPoints, "#b8bbb1", -1);
+  quads("roads", roadPoints, "#667171", -2);
+  quads("road-markings", markings, "#e4dec3", -3);
   quads("sports-surrounds-and-helipad-base", concrete, "#b0b5a6");
   quads("football-pitches", sportsPoints, "#6f8d64");
   quads("helipad", helipad, "#5f7569");

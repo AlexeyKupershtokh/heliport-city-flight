@@ -31,8 +31,8 @@ scene.add(sun);
 const camera = new THREE.PerspectiveCamera(
   57,
   innerWidth / innerHeight,
-  0.12,
-  3500,
+  1,
+  3000,
 );
 let city = createCity(scene, 42);
 let obstacles = city.collisionBoxes || [...city.buildings, ...city.bridges];
@@ -47,6 +47,14 @@ let gateIndex = 0,
   elapsed = 0,
   seed = 42,
   toastTimeout;
+const targetLabels = [$("target-label")];
+for (let i = 1; i < 3; i++) {
+  const label = targetLabels[0].cloneNode(true);
+  label.id = `target-label-${i + 1}`;
+  label.classList.add("upcoming");
+  document.body.append(label);
+  targetLabels.push(label);
+}
 const keys = new Set();
 const stick = { pitch: 0, roll: 0, yaw: 0 };
 const routePoints = [
@@ -296,7 +304,7 @@ function start() {
   $("mission").hidden = false;
   document.body.classList.remove("intro-visible");
   setActive(true);
-  toast("↑ — набрать высоту · W — полететь вперёд");
+  toast("W — разгон · S — торможение · мышь в стороны — поворот");
 }
 function reset() {
   flight = createFlight(city.spawn);
@@ -342,7 +350,7 @@ function setMouse() {
   $("input-label").textContent = mouseMode ? "Мышь" : "Клавиатура";
   toast(
     mouseMode
-      ? "Зажмите мышь и ведите по небу · колесо — общий шаг"
+      ? "Мышь в стороны — поворот · вверх — разгон · вниз — торможение"
       : "Клавиатура · WASD, QE, ↑↓",
   );
 }
@@ -464,12 +472,13 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointermove", (e) => {
   if (!mouseMode || e.pointerId !== dragId) return;
-  stick.roll = clamp((e.clientX - dragOrigin.x) / 170, -1, 1);
-  stick.pitch = clamp((dragOrigin.y - e.clientY) / 170, -1, 1);
+  stick.yaw = clamp((e.clientX - dragOrigin.x) / 150, -1, 1);
+  stick.roll = stick.yaw * 0.22;
+  stick.pitch = clamp((dragOrigin.y - e.clientY) / 150, -1, 1);
 });
 function releaseDrag() {
   dragId = null;
-  stick.pitch = stick.roll = 0;
+  stick.pitch = stick.roll = stick.yaw = 0;
 }
 canvas.addEventListener("pointerup", releaseDrag);
 canvas.addEventListener("pointercancel", releaseDrag);
@@ -647,7 +656,7 @@ function updateHUD() {
   $("altitude").textContent = Math.round(flight.position.y);
   $("climb").textContent =
     `${flight.velocity.y >= 0 ? "+" : ""}${flight.velocity.y.toFixed(1)} м/с`;
-  $("speed-bar").style.width = `${Math.min((speed / 150) * 100, 100)}%`;
+  $("speed-bar").style.width = `${Math.min((speed / 240) * 100, 100)}%`;
   $("altitude-bar").style.width =
     `${Math.min((flight.position.y / 300) * 100, 100)}%`;
   $("thrust-value").textContent = `${Math.round(input.collective * 100)}%`;
@@ -677,22 +686,56 @@ function updateHUD() {
   updateAudio();
 }
 function updateTarget() {
-  const label = $("target-label"),
-    g = gates[gateIndex];
-  if (!started || mode !== "arcade" || !g) {
-    label.hidden = true;
-    return;
-  }
-  projected.set(g.x, g.y + 25, g.z).project(camera);
-  label.hidden =
-    projected.z > 1 ||
-    projected.z < -1 ||
-    Math.abs(projected.x) > 0.95 ||
-    Math.abs(projected.y) > 0.7;
-  if (!label.hidden) {
-    label.style.left = `${(projected.x * 0.5 + 0.5) * innerWidth}px`;
-    label.style.top = `${(-projected.y * 0.5 + 0.5) * innerHeight}px`;
-    label.innerHTML = `${String(gateIndex + 1).padStart(2, "0")} <span>ВОРОТА</span>`;
+  for (let offset = 0; offset < targetLabels.length; offset++) {
+    const label = targetLabels[offset];
+    const index = gateIndex + offset;
+    const gate = gates[index];
+    if (!started || mode !== "arcade" || !gate) {
+      label.hidden = true;
+      continue;
+    }
+    const distance = Math.round(
+      Math.hypot(
+        gate.x - flight.position.x,
+        gate.y - flight.position.y,
+        gate.z - flight.position.z,
+      ),
+    );
+    projected
+      .set(gate.x, gate.y, gate.z)
+      .applyMatrix4(camera.matrixWorldInverse);
+    const behind = projected.z >= 0;
+    const side =
+      Math.abs(projected.x) > Math.abs(projected.y)
+        ? projected.x < 0
+          ? "← СЛЕВА"
+          : "СПРАВА →"
+        : projected.y > 0
+          ? "↑ ВЫШЕ"
+          : "↓ НИЖЕ";
+    projected.set(gate.x, gate.y, gate.z).project(camera);
+    const onScreen =
+      !behind && Math.abs(projected.x) < 0.82 && Math.abs(projected.y) < 0.62;
+    label.hidden = offset > 0 && !onScreen;
+    if (label.hidden) continue;
+    label.classList.toggle("offscreen", !onScreen);
+    if (onScreen) projected.set(gate.x, gate.y - 24, gate.z).project(camera);
+    label.style.left = onScreen
+      ? `${(projected.x * 0.5 + 0.5) * innerWidth}px`
+      : "50%";
+    label.style.top = onScreen
+      ? `${clamp((-projected.y * 0.5 + 0.5) * innerHeight, innerWidth < 700 ? 280 : 160, innerHeight - (innerWidth < 700 ? 340 : 230))}px`
+      : "45%";
+    label.querySelector(".gate-number").textContent =
+      `ВОРОТА ${String(index + 1).padStart(2, "0")}`;
+    label.querySelector(".gate-distance").textContent = `${distance} м`;
+    label.querySelector(".gate-direction").textContent = onScreen
+      ? offset === 0
+        ? "СЛЕДУЮЩИЕ"
+        : "ДАЛЕЕ"
+      : behind
+        ? "↻ ПОЗАДИ"
+        : side;
   }
 }
 // GPU timer queries measure completed GPU work without stalling the render loop.

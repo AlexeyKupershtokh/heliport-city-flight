@@ -58,8 +58,8 @@ function crash(state) {
       0;
 }
 
-// F = rotor thrust - gravity - linear/quadratic drag; angular acceleration models
-// a damped attitude stabilizer. Rotor thrust lags the collective by 0.3 seconds.
+// Arcade assists amplify horizontal thrust, compensate tilt-induced altitude loss,
+// and turn momentum with the nose. Drag and damped angular response retain inertia.
 // shortcut: no blade aerodynamics or vortex-ring state; upgrade for training use.
 export function stepFlight(state, input, dt, obstacles = [], bounds = 1200) {
   if (state.crashed || !Number.isFinite(dt) || dt <= 0) return state;
@@ -75,30 +75,38 @@ export function stepFlight(state, input, dt, obstacles = [], bounds = 1200) {
   const av = state.angularVelocity;
 
   for (let step = 0; step < steps; step++) {
-    av.x += ((pitch * 0.48 - state.pitch) * 8 - av.x * 4.4) * h;
-    av.z += ((roll * 0.55 - state.roll) * 8 - av.z * 4.4) * h;
-    av.y += (yaw * 0.8 - av.y) * 3 * h;
+    const horizontalSpeed = Math.hypot(v.x, v.z);
+    av.x += ((pitch * 0.48 - state.pitch) * 42 - av.x * 11) * h;
+    av.z += ((roll * 0.55 - state.roll) * 42 - av.z * 11) * h;
+    const turnRate = Math.min(1.4, 55 / Math.max(horizontalSpeed, 1));
+    av.y += (yaw * turnRate - av.y) * (1 - Math.exp(-h * 6));
     state.pitch += av.x * h;
     state.roll += av.z * h;
-    state.yaw += av.y * h;
+    const turn = av.y * h;
+    state.yaw += turn;
+    const turnedX = v.x * Math.cos(turn) - v.z * Math.sin(turn);
+    v.z = v.x * Math.sin(turn) + v.z * Math.cos(turn);
+    v.x = turnedX;
     state.rotorThrust +=
       (state.collective * 2 * MASS * GRAVITY - state.rotorThrust) *
-      (1 - Math.exp(-h / 0.3));
+      (1 - Math.exp(-h / 0.18));
 
-    const thrust = state.rotorThrust / MASS;
+    const verticalFactor = Math.cos(state.roll) * Math.cos(state.pitch);
+    const thrust = state.rotorThrust / MASS / Math.max(0.4, verticalFactor);
     const localX = Math.sin(state.roll) * Math.cos(state.pitch);
     const localZ = -Math.sin(state.pitch);
     const cosYaw = Math.cos(state.yaw);
     const sinYaw = Math.sin(state.yaw);
-    const speed = Math.hypot(v.x, v.y, v.z);
-    const drag = 0.07 + speed * 0.008;
-    v.x += ((localX * cosYaw - localZ * sinYaw) * thrust - v.x * drag) * h;
+    const drag = 0.16 + horizontalSpeed * 0.003;
+    v.x +=
+      ((localX * cosYaw - localZ * sinYaw) * thrust * 3.9 - v.x * drag) * h;
     v.y +=
-      (Math.cos(state.roll) * Math.cos(state.pitch) * thrust -
+      (verticalFactor * thrust -
         GRAVITY -
         v.y * (0.13 + Math.abs(v.y) * 0.01)) *
       h;
-    v.z += ((localX * sinYaw + localZ * cosYaw) * thrust - v.z * drag) * h;
+    v.z +=
+      ((localX * sinYaw + localZ * cosYaw) * thrust * 3.9 - v.z * drag) * h;
 
     const dx = v.x * h;
     const dy = v.y * h;
