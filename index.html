@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#182624">
+<meta name="description" content="HELIPORT — полёты над процедурным городом. Управляйте вертолётом, исследуйте набережные и проходите воздушные маршруты.">
+<title>HELIPORT — город с новой высоты</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23e77f49'/%3E%3Ctext x='32' y='46' font-family='Arial' font-weight='bold' font-size='42' text-anchor='middle' fill='%23182624'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="world" aria-label="Трёхмерный город и вертолёт"></canvas>
+<div class="vignette"></div>
+<header class="topbar">
+  <a class="brand" href="./" aria-label="HELIPORT — начало"><span class="brand-mark">H</span><span>HELIPORT<small>ГОРОДСКОЙ АВИАСИМУЛЯТОР</small></span></a>
+  <nav class="mode-switch" aria-label="Режим полёта"><button id="free-mode" aria-pressed="false">Свободный полёт</button><button id="arcade-mode" class="selected" aria-pressed="true"><span class="ring-icon"></span> Маршрут</button></nav>
+  <div class="top-actions"><span class="weather">☀ <span>17° <i>ВЕТЕР 0 М/С</i></span></span><button id="audio-button" class="icon-button" aria-label="Включить звук" title="Звук">♪</button><button id="help-button" class="icon-button" aria-label="Управление и помощь" title="Управление">?</button></div>
+</header>
+<div class="compass"><div class="compass-labels"><span>З</span><span>СЗ</span><b id="heading">000° С</b><span>СВ</span><span>В</span></div><div class="compass-ticks"></div><span class="compass-needle"></span></div>
+<aside class="intro" id="intro">
+ <div class="eyebrow"><span class="live-dot"></span> ВАШЕ НЕБО. ВАШ МАРШРУТ.</div>
+ <h1>Город с<br>новой высоты<span>.</span></h1>
+ <p>Наберите высоту. Почувствуйте инерцию.<br>Найдите свой путь между небом и городом.</p>
+ <button id="start-button" class="primary">Начать полёт <span>↗</span></button>
+ <div class="intro-note"><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><span>или мышь — решать вам</span></div>
+</aside>
+<aside class="mission panel" id="mission" hidden><div class="eyebrow"><span class="live-dot"></span><span id="mission-label">ВОЗДУШНЫЙ МАРШРУТ</span></div><div class="mission-row"><h2 id="mission-title">Над новым берегом</h2><span id="gate-count">00 / 12</span></div><div class="progress-track"><div id="progress-fill"></div></div><div class="mission-footer"><span id="gate-distance">Следующие ворота · 210 м</span><span id="timer">00:00</span></div></aside>
+<div class="flight-state" id="flight-state" hidden><span class="live-dot"></span><span id="state-label">В ПОЛЁТЕ</span></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div class="aim" id="aim"><span></span><i></i></div>
+<div id="target-label" class="target-label" hidden>01 <span>ВОРОТА</span></div>
+<div id="cockpit-frame" hidden><div class="cockpit-top"></div><div class="cockpit-side left"></div><div class="cockpit-side right"></div><div class="cockpit-dash"></div></div>
+<aside class="view-tools"><button id="camera-button" class="tool-button" title="Сменить камеру · C"><span class="camera-icon">▣</span><span id="camera-label">Вид сзади</span><kbd>C</kbd></button><button id="mouse-button" class="tool-button" aria-pressed="false" title="Управление мышью · M"><span>⌖</span><span id="input-label">Клавиатура</span><kbd>M</kbd></button><button id="pause-button" class="tool-button" title="Пауза · P"><span>Ⅱ</span><span id="pause-label">Пауза</span><kbd>P</kbd></button></aside>
+<section class="instruments panel" aria-label="Полётные приборы">
+ <div class="instrument"><label>СКОРОСТЬ</label><div><strong id="speed">0</strong><span>км/ч</span></div><div class="instrument-scale"><i id="speed-bar"></i></div></div>
+ <div class="instrument"><label>ВЫСОТА</label><div><strong id="altitude">75</strong><span>м</span></div><div class="instrument-scale"><i id="altitude-bar"></i></div></div>
+ <div class="attitude" title="Авиагоризонт"><div class="attitude-inner" id="attitude"><div></div></div><span>— ● —</span><small id="climb">+0.0 м/с</small></div>
+ <div class="collective"><label for="collective">ОБЩИЙ ШАГ <b id="thrust-value">50%</b></label><input id="collective" type="range" min="0" max="100" value="50" aria-label="Общий шаг ротора"><div><span>МИН</span><span>МАКС</span></div></div>
+ <button id="neutral-button" class="neutral-button" title="Вернуть управление в нейтраль · пробел">Нейтраль <kbd>SPACE</kbd></button>
+</section>
+<aside class="map panel"><div class="map-top"><span><i class="live-dot"></i> НОВЫЙ БЕРЕГ</span><button id="new-city" aria-label="Сгенерировать новый город" title="Новый город">↻</button></div><div class="map-canvas-wrap"><canvas id="minimap" width="400" height="400" aria-label="Миникарта города с вертолётом и маршрутом"></canvas><span class="north">С ↑</span><span class="map-scale">500 м ━━━</span></div><div class="map-bottom"><span id="coordinates">−130 / +680</span><span id="map-seed">СЕКТОР 042</span></div></aside>
+<footer class="bottom-bar"><div class="control-hints"><span><kbd>W A S D</kbd> Наклон</span><span><kbd>Q E</kbd> Рыскание</span><span><kbd>↑ ↓</kbd> Общий шаг</span><span><kbd>R</kbd> На старт</span></div><div class="performance"><span class="live-dot"></span><span id="fps">60 FPS</span><span class="divider"></span><span id="frame-time">CPU — · GPU —</span></div></footer>
+<div class="touch-controls"><div id="joystick" aria-label="Джойстик наклона"><span></span></div><div class="touch-yaw"><button id="yaw-left" aria-label="Поворот влево">↶</button><button id="yaw-right" aria-label="Поворот вправо">↷</button></div></div>
+<dialog id="help-dialog"><button class="dialog-close" id="close-help" aria-label="Закрыть помощь">×</button><div class="eyebrow">ЛЁТНАЯ ШКОЛА / 01</div><h2>Почувствуйте полёт.</h2><p>Вертолёт уже в воздухе. Наклоняйте ротор, чтобы разгоняться. При отпускании управления корпус выравнивается, но скорость сохраняется — для торможения наклонитесь в обратную сторону.</p><dl><dt>W / S</dt><dd>Наклон вперёд / назад</dd><dt>A / D</dt><dd>Крен влево / вправо</dd><dt>Q / E</dt><dd>Поворот носа</dd><dt>↑ / ↓</dt><dd>Увеличить / уменьшить общий шаг</dd><dt>Пробел</dt><dd>Нейтраль: оси в центр, шаг 50%</dd><dt>M / мышь</dt><dd>Включить мышь; зажать и вести по небу для наклона, колесо — шаг</dd><dt>C</dt><dd>Кабина / вид сзади</dd><dt>P / R</dt><dd>Пауза / вернуться на старт</dd></dl><p class="help-tip">В маршруте пролетайте сквозь оранжевые кольца по порядку. Зелёные уже пройдены. Для мягкой посадки снизьте вертикальную скорость до 3 м/с. Столкновение завершает полёт.</p><button id="help-done" class="primary">Понятно, к полёту <span>↗</span></button></dialog>
+<div id="result" class="result-overlay" hidden><div class="result-card panel"><div class="eyebrow" id="result-kicker">ПОЛЁТ ЗАВЕРШЁН</div><h2 id="result-title">Маршрут пройден</h2><p id="result-copy"></p><button id="restart-button" class="primary">Новый вылет <span>↗</span></button></div></div>
+<div id="error" hidden role="alert"></div>
+<script type="module" src="./main.js"></script>
+</body></html>
